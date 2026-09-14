@@ -19,8 +19,8 @@ sih26137/
 
 ## Status
 - [x] Day 1 — Literature review + gap statement (`docs/literature_review.md`)
-- [ ] Day 2 — Problem formulation + architecture diagram
-- [ ] Day 3+ — Network module
+- [x] Day 2 — Problem formulation (`docs/formulation.md`) + architecture diagram (`docs/architecture.md`)
+- [ ] Day 3+ — Network module (`src/network/`)
 
 ## Setup
 ```
