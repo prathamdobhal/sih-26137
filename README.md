@@ -20,7 +20,15 @@ sih26137/
 ## Status
 - [x] Day 1 — Literature review + gap statement (`docs/literature_review.md`)
 - [x] Day 2 — Problem formulation (`docs/formulation.md`) + architecture diagram (`docs/architecture.md`)
-- [ ] Day 3+ — Network module (`src/network/`)
+- [x] Day 3 — Network module: synthetic generator, OSM loader (Koramangala, Bengaluru), traffic simulator (`src/network/`)
+- [ ] Day 4+ — Baseline algorithms (Dijkstra + GA)
+
+## Data source
+Real road topology: [OpenStreetMap](https://www.openstreetmap.org) contributors, fetched via the
+[`osmnx`](https://osmnx.readthedocs.io) Python library (Overpass API). Default demo area:
+Koramangala, Bengaluru — change `DEFAULT_PLACE` in `src/network/osm_loader.py` to use a different area.
+Traffic congestion is **simulated** on top of the real graph (`src/network/traffic_simulator.py`) —
+this project does not use a live/real-time traffic feed.
 
 ## Setup
 ```
