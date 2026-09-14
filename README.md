@@ -20,8 +20,9 @@ sih26137/
 ## Status
 - [x] Day 1 — Literature review + gap statement (`docs/literature_review.md`)
 - [x] Day 2 — Problem formulation (`docs/formulation.md`) + architecture diagram (`docs/architecture.md`)
-- [x] Day 3 — Network module: synthetic generator, OSM loader (Koramangala, Bengaluru), traffic simulator (`src/network/`)
-- [ ] Day 4+ — Baseline algorithms (Dijkstra + GA)
+- [x] Day 3 — Network module: synthetic generator, OSM loader (Koramangala, Bengaluru — confirmed live: 2105 nodes / 5297 edges), traffic simulator (`src/network/`)
+- [x] Day 4 — Baseline algorithms: hand-implemented Dijkstra (cross-validated vs. networkx), VRP instance generator, GA solver for CVRP (`src/solvers/`)
+- [ ] Day 5+ — QPSO core engine
 
 ## Data source
 Real road topology: [OpenStreetMap](https://www.openstreetmap.org) contributors, fetched via the
