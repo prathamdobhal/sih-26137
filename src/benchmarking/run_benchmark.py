@@ -107,17 +107,35 @@ def write_summary(rows: list):
                      f"{avg_imp:+.1f}% | {avg_ga_t:.2f} | {avg_qpso_t:.2f} |")
 
     lines.append("\n## Interpretation\n")
+
+    # Computed dynamically from the actual run's data — never hardcoded, so this
+    # paragraph is always consistent with the table above it regardless of
+    # machine, platform, or numpy/random version differences run to run.
+    imp_by_tier = {t: np.mean([r["qpso_improvement_pct"] for r in rows if r["tier"] == t]) for t in tiers}
+    std_by_tier = {t: (np.std([r["ga_cost"] for r in rows if r["tier"] == t]),
+                        np.std([r["qpso_cost"] for r in rows if r["tier"] == t])) for t in tiers}
+    best_row = max(rows, key=lambda r: r["qpso_improvement_pct"])
+    worst_row = min(rows, key=lambda r: r["qpso_improvement_pct"])
+
+    variance_note = "; ".join(
+        f"{t}: GA std ≈ {std_by_tier[t][0]:.0f} vs. QPSO std ≈ {std_by_tier[t][1]:.0f}"
+        for t in tiers
+    )
+    avg_imp_note = "; ".join(f"{t}: {imp_by_tier[t]:+.1f}%" for t in tiers)
+
     lines.append(
-        "QPSO-adaptive's standard deviation across seeds is noticeably larger than GA's at the "
-        "medium and large tiers (e.g. medium: GA std ≈ 730 vs. QPSO std ≈ 2,900 in this run). "
-        "This means QPSO occasionally finds a substantially better solution than GA (best case, "
-        "seed 4, medium tier: 23,482 vs. GA's 29,156 — a 19% improvement) but is less consistently "
-        "reliable run-to-run at current hyperparameters. Averaged across seeds, the net effect at "
-        "these sizes is close to parity rather than a clear win. This is an honest, reportable "
-        "characteristic of the algorithm — not a benchmarking error — and is consistent with QPSO's "
-        "documented tendency toward stronger but noisier global search. Future work: per-instance-size "
-        "hyperparameter tuning (larger swarm size at larger N, adaptive beta scheduling) to reduce "
-        "variance without sacrificing the occasional large wins."
+        f"QPSO-adaptive's run-to-run variance vs. GA by tier — {variance_note}. "
+        f"Average improvement by tier — {avg_imp_note}. "
+        f"Best single-run result: {best_row['tier']} tier, seed {best_row['seed']}, "
+        f"QPSO {best_row['qpso_cost']:.0f} vs. GA {best_row['ga_cost']:.0f} "
+        f"({best_row['qpso_improvement_pct']:+.1f}%). Weakest single-run result: "
+        f"{worst_row['tier']} tier, seed {worst_row['seed']} "
+        f"({worst_row['qpso_improvement_pct']:+.1f}%). "
+        "This spread is an honest, reportable characteristic of the algorithm — not a "
+        "benchmarking error — and is consistent with QPSO's documented tendency toward "
+        "stronger but noisier global search. Future work: per-instance-size hyperparameter "
+        "tuning (larger swarm size at larger N, adaptive beta scheduling) to reduce variance "
+        "without sacrificing the occasional large wins."
     )
 
     path = REPORTS_DIR / "benchmark_summary.md"

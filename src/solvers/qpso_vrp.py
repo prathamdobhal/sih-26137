@@ -105,10 +105,17 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
                          beta_max: float = 1.0, beta_min: float = 0.4,
                          local_search_every: int = 5, reinit_fraction: float = 0.10,
                          stagnation_window: int = 30, diversity_threshold: float = 0.02,
-                         seed: int = 42, verbose: bool = False):
+                         seed: int = 42, verbose: bool = False,
+                         init_positions: np.ndarray = None):
     """
     QPSO + 2-opt local search + stagnation control (Phase 6). Same update rule
     as solve_qpso, plus:
+
+    init_positions: optional (swarm_size, n_customers) array to WARM-START the
+    swarm from a previous run's final positions instead of random init — used
+    by src/dynamic/rerouting.py when traffic conditions change. Personal bests
+    are re-evaluated fresh against `inst` (which may have an updated distance
+    matrix), not carried over, since the fitness landscape may have shifted.
 
     - Every `local_search_every` iterations, 2-opt polishes the current gbest's
       decoded routes; if the polished version is better, it REPLACES gbest by
@@ -126,7 +133,11 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
     rng = np.random.default_rng(seed)
     n = len(inst.customers)
 
-    positions = rng.random((swarm_size, n))
+    if init_positions is not None:
+        positions = init_positions.copy()
+        swarm_size = positions.shape[0]
+    else:
+        positions = rng.random((swarm_size, n))
     pbest = positions.copy()
     pbest_fitness = np.array([_fitness(positions[i], inst) for i in range(swarm_size)])
 
@@ -209,4 +220,5 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
         "gbest_history": history,
         "diversity_history": diversity_history,
         "reinit_events": reinit_events,
+        "final_positions": positions,  # for warm-starting a future re-optimization
     }
