@@ -24,7 +24,8 @@ sih26137/
 - [x] Day 4 — Baseline algorithms: hand-implemented Dijkstra (cross-validated vs. networkx), VRP instance generator, GA solver for CVRP (`src/solvers/`)
 - [x] Day 5 — QPSO core engine, SPV-decoded, mbest/potential-well update (`src/solvers/qpso_vrp.py`)
 - [x] Day 6 — 2-opt local search (`src/solvers/local_search.py`) + adaptive QPSO with stagnation control (`solve_qpso_adaptive`). Tuned via real hyperparameter sweep — final config: `reinit_fraction=0.10, stagnation_window=30, diversity_threshold=0.02, local_search_every=5`. Confirmed result: ties GA on small instances (15 customers, -0.1%), beats GA by ~2.4% on larger instances (45 customers) — matches VRP literature's expectation that metaheuristic gaps widen with problem size.
-- [ ] Day 7+ — Full benchmarking suite across small/medium/large graphs + convergence charts
+- [x] Day 7 — Full benchmarking suite across small/medium/large tiers (`src/benchmarking/run_benchmark.py`), doubling as the Phase 13 scalability report. Outputs: `reports/benchmark_results.csv`, `reports/benchmark_summary.md`, convergence + scalability charts in `reports/figures/`. Honest finding: QPSO has higher run-to-run variance than GA at larger sizes (occasional 19% wins, occasional losses), averaging out near parity — flagged as a real property, not a bug, with tuning noted as future work.
+- [ ] Day 8+ — Dynamic traffic rerouting (Phase 8)
 
 ## Data source
 Real road topology: [OpenStreetMap](https://www.openstreetmap.org) contributors, fetched via the
