@@ -221,4 +221,6 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
         "diversity_history": diversity_history,
         "reinit_events": reinit_events,
         "final_positions": positions,  # for warm-starting a future re-optimization
+        "final_pbest": pbest,          # for explainability: alternative candidates
+        "final_pbest_fitness": pbest_fitness,
     }
