@@ -95,3 +95,75 @@ def build_distance_matrix(G: nx.DiGraph, nodes: list) -> np.ndarray:
                 matrix[i, idx[node]] = d
 
     return matrix
+
+
+def edge_emissions(data: dict, base_rate: float = 120.0) -> float:
+    """
+    Emissions estimate for a single edge, in grams CO2 (order-of-magnitude
+    demo figure, not a sensor-calibrated value — matches docs/formulation.md
+    Section 5's stated design: no real sensor data required).
+
+    speed_factor is a simple U-shaped curve: low speed (stop-start idling)
+    and very high speed (inefficiency) both cost more than a mid-range
+    cruising speed — a standard qualitative shape in traffic-emissions
+    literature (MOVES/COPERT-style speed-emission curves), simplified to a
+    3-tier piecewise constant for the prototype.
+    """
+    speed_kph = data.get("speed_kph", 30.0)
+    if speed_kph < 20:
+        speed_factor = 1.5
+    elif speed_kph <= 60:
+        speed_factor = 1.0
+    else:
+        speed_factor = 1.3
+    distance_km = data["length_m"] / 1000
+    return base_rate * distance_km * speed_factor
+
+
+def build_full_metrics_matrices(G: nx.DiGraph, nodes: list) -> dict:
+    """
+    Builds FOUR NxN matrices in one pass (reusing the same Dijkstra runs
+    build_distance_matrix already does, at no extra Dijkstra cost):
+      - time      : travel time in seconds (same as build_distance_matrix)
+      - distance  : real road distance in meters
+      - congestion: congestion EXPOSURE (congestion * time_on_edge), summed along the path
+      - emissions : grams CO2 (distance/speed term only — idle-per-stop is
+                    added separately in evaluate.py, since it's a per-customer-visit
+                    cost, not a per-edge one)
+
+    These back the full multi-objective F(R) = a.T + b.D + g.C + d.E from
+    docs/formulation.md, and the mode weight presets (Fastest/Eco/Balanced/
+    Emergency) that select between them.
+    """
+    n = len(nodes)
+    idx = {node: i for i, node in enumerate(nodes)}
+    time_m = np.full((n, n), np.inf)
+    dist_m = np.zeros((n, n))
+    cong_m = np.zeros((n, n))
+    emis_m = np.zeros((n, n))
+    np.fill_diagonal(time_m, 0.0)
+
+    for i, src in enumerate(nodes):
+        targets = set(nodes) - {src}
+        _, prev = dijkstra(G, src, targets=targets)
+        for target in targets:
+            if target not in prev and target != src:
+                continue  # unreachable, leave as inf/0
+            path = reconstruct_path(prev, src, target)
+            if not path:
+                continue
+            j = idx[target]
+            t_total = d_total = c_total = e_total = 0.0
+            for p1, p2 in zip(path[:-1], path[1:]):
+                edge = G[p1][p2]
+                t = edge_travel_time(edge)
+                t_total += t
+                d_total += edge["length_m"]
+                c_total += min(edge.get("congestion", 0.0), 0.9) * t
+                e_total += edge_emissions(edge)
+            time_m[i, j] = t_total
+            dist_m[i, j] = d_total
+            cong_m[i, j] = c_total
+            emis_m[i, j] = e_total
+
+    return {"time": time_m, "distance": dist_m, "congestion": cong_m, "emissions": emis_m}

@@ -22,7 +22,8 @@ import networkx as nx
 
 from src.solvers.instance import VRPInstance
 from src.solvers.evaluate import route_set_cost
-from src.solvers.shortest_path import dijkstra, reconstruct_path, build_distance_matrix
+from src.solvers.shortest_path import dijkstra, reconstruct_path, build_full_metrics_matrices
+from src.solvers.instance import compute_term_scales
 from src.solvers.qpso_vrp import decode_particle
 
 
@@ -115,8 +116,15 @@ def sensitivity_score(candidates: list, inst: VRPInstance, G: nx.DiGraph,
             factor = 1.0 + rng.uniform(-perturb_pct, perturb_pct)
             G[u][v]["congestion"] = float(np.clip(original_congestion[(u, v)] * factor, 0.0, 0.9))
 
-        perturbed_matrix = build_distance_matrix(G, inst.nodes)
-        perturbed_inst = replace(inst, distance_matrix=perturbed_matrix)
+        perturbed_matrices = build_full_metrics_matrices(G, inst.nodes)
+        perturbed_inst = replace(
+            inst,
+            distance_matrix=perturbed_matrices["time"],
+            raw_distance_matrix=perturbed_matrices["distance"],
+            congestion_matrix=perturbed_matrices["congestion"],
+            emissions_matrix=perturbed_matrices["emissions"],
+            term_scales=compute_term_scales(perturbed_matrices),
+        )
 
         costs = [route_set_cost(c["routes"], perturbed_inst)["cost"] for c in candidates]
         if int(np.argmin(costs)) == 0:

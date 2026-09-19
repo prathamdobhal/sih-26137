@@ -41,9 +41,9 @@ def split_into_routes(permutation: list, inst: VRPInstance) -> list:
     return routes
 
 
-def _fitness(permutation: list, inst: VRPInstance) -> float:
+def _fitness(permutation: list, inst: VRPInstance, mode: str = "fastest") -> float:
     routes = split_into_routes(permutation, inst)
-    return route_set_cost(routes, inst)["cost"]
+    return route_set_cost(routes, inst, mode=mode)["cost"]
 
 
 def _order_crossover(parent1: list, parent2: list, rng: random.Random) -> list:
@@ -77,7 +77,8 @@ def _tournament_select(population: list, fitnesses: list, rng: random.Random, k:
 
 
 def solve_ga(inst: VRPInstance, pop_size: int = 60, generations: int = 150,
-             elite_frac: float = 0.1, seed: int = 42, verbose: bool = False):
+             elite_frac: float = 0.1, seed: int = 42, verbose: bool = False,
+             mode: str = "fastest"):
     """
     Runs the GA and returns (best_routes, best_cost, convergence_history) —
     the history list is what feeds the Phase 7 convergence chart.
@@ -91,7 +92,7 @@ def solve_ga(inst: VRPInstance, pop_size: int = 60, generations: int = 150,
     best_perm, best_cost = None, float("inf")
 
     for gen in range(generations):
-        fitnesses = [_fitness(p, inst) for p in population]
+        fitnesses = [_fitness(p, inst, mode=mode) for p in population]
 
         gen_best_idx = min(range(pop_size), key=lambda i: fitnesses[i])
         if fitnesses[gen_best_idx] < best_cost:

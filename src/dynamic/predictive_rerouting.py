@@ -21,7 +21,8 @@ from dataclasses import replace
 
 from src.network.synthetic import make_synthetic_graph
 from src.solvers.instance import generate_instance, VRPInstance
-from src.solvers.shortest_path import dijkstra, reconstruct_path, build_distance_matrix
+from src.solvers.shortest_path import dijkstra, reconstruct_path, build_full_metrics_matrices
+from src.solvers.instance import compute_term_scales
 from src.solvers.qpso_vrp import solve_qpso_adaptive
 from src.dynamic.predictor import HoltForecaster
 
@@ -100,8 +101,15 @@ def run_ab_comparison(n_nodes: int = 200, n_customers: int = 15, seed: int = 42,
                     should_reroute = True
 
             if should_reroute:
-                new_matrix = build_distance_matrix(sim_g, current_inst.nodes)
-                current_inst = replace(current_inst, distance_matrix=new_matrix)
+                new_matrices = build_full_metrics_matrices(sim_g, current_inst.nodes)
+                current_inst = replace(
+                    current_inst,
+                    distance_matrix=new_matrices["time"],
+                    raw_distance_matrix=new_matrices["distance"],
+                    congestion_matrix=new_matrices["congestion"],
+                    emissions_matrix=new_matrices["emissions"],
+                    term_scales=compute_term_scales(new_matrices),
+                )
                 current_routes, _, meta = solve_qpso_adaptive(
                     current_inst, iterations=60, seed=seed, init_positions=current_positions
                 )

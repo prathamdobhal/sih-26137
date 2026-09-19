@@ -38,9 +38,9 @@ def decode_particle(position: np.ndarray, inst: VRPInstance) -> list:
     return split_into_routes(permutation, inst)
 
 
-def _fitness(position: np.ndarray, inst: VRPInstance) -> float:
+def _fitness(position: np.ndarray, inst: VRPInstance, mode: str = "fastest") -> float:
     routes = decode_particle(position, inst)
-    return route_set_cost(routes, inst)["cost"]
+    return route_set_cost(routes, inst, mode=mode)["cost"]
 
 
 def solve_qpso(inst: VRPInstance, swarm_size: int = 40, iterations: int = 150,
@@ -106,7 +106,7 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
                          local_search_every: int = 5, reinit_fraction: float = 0.10,
                          stagnation_window: int = 30, diversity_threshold: float = 0.02,
                          seed: int = 42, verbose: bool = False,
-                         init_positions: np.ndarray = None):
+                         init_positions: np.ndarray = None, mode: str = "fastest"):
     """
     QPSO + 2-opt local search + stagnation control (Phase 6). Same update rule
     as solve_qpso, plus:
@@ -139,14 +139,14 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
     else:
         positions = rng.random((swarm_size, n))
     pbest = positions.copy()
-    pbest_fitness = np.array([_fitness(positions[i], inst) for i in range(swarm_size)])
+    pbest_fitness = np.array([_fitness(positions[i], inst, mode=mode) for i in range(swarm_size)])
 
     gbest_idx = int(np.argmin(pbest_fitness))
     gbest = pbest[gbest_idx].copy()
     gbest_fitness = pbest_fitness[gbest_idx]
 
     polished_routes = decode_particle(gbest, inst)
-    polished_cost = route_set_cost(polished_routes, inst)["cost"]
+    polished_cost = route_set_cost(polished_routes, inst, mode=mode)["cost"]
 
     history = [gbest_fitness]
     diversity_history = [_swarm_diversity(positions)]
@@ -165,7 +165,7 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
             sign = rng.choice([-1.0, 1.0], size=n)
             positions[i] = p + sign * beta * np.abs(mbest - positions[i]) * np.log(1.0 / u)
 
-            fit = _fitness(positions[i], inst)
+            fit = _fitness(positions[i], inst, mode=mode)
             if fit < pbest_fitness[i]:
                 pbest[i] = positions[i].copy()
                 pbest_fitness[i] = fit
@@ -178,7 +178,7 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
         if (it + 1) % local_search_every == 0:
             candidate_routes = decode_particle(gbest, inst)
             candidate_routes = polish_routes(candidate_routes, inst)
-            candidate_cost = route_set_cost(candidate_routes, inst)["cost"]
+            candidate_cost = route_set_cost(candidate_routes, inst, mode=mode)["cost"]
             if candidate_cost < polished_cost:
                 polished_cost = candidate_cost
                 polished_routes = candidate_routes
@@ -197,7 +197,7 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
             for idx in worst_idx:
                 positions[idx] = rng.random(n)
                 pbest[idx] = positions[idx].copy()
-                pbest_fitness[idx] = _fitness(positions[idx], inst)
+                pbest_fitness[idx] = _fitness(positions[idx], inst, mode=mode)
             reinit_events.append(it)
             iters_since_improvement = 0
             if verbose:

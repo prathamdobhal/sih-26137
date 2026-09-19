@@ -12,20 +12,32 @@ from dataclasses import replace
 import time
 
 from src.network.traffic_simulator import TrafficSimulator
-from src.solvers.instance import VRPInstance
-from src.solvers.shortest_path import build_distance_matrix
+from src.solvers.instance import VRPInstance, compute_term_scales
+from src.solvers.shortest_path import build_full_metrics_matrices
 from src.solvers.qpso_vrp import solve_qpso_adaptive
 
 
 def recompute_instance_for_traffic(inst: VRPInstance, sim: TrafficSimulator) -> VRPInstance:
     """
-    After congestion changes on sim.G, the distance matrix (which encodes
-    travel times, not raw distances) is stale. Recompute it via Dijkstra on
-    the current graph state and return a NEW VRPInstance (dataclasses.replace
-    keeps depot/customers/demand identical — only the matrix changes).
+    After congestion changes on sim.G, ALL FOUR matrices (time, distance,
+    congestion, emissions) are stale, not just travel time — a congested
+    edge changes both how long it takes AND how much congestion exposure a
+    route through it accumulates. Recompute everything together via one
+    Dijkstra pass (build_full_metrics_matrices) so time/congestion/emissions
+    stay mutually consistent; recomputing only the time matrix here was a
+    real bug caught during Day 11 testing (mode-weighted cost was scoring
+    routes against stale congestion data after an incident).
     """
-    new_matrix = build_distance_matrix(sim.G, inst.nodes)
-    return replace(inst, distance_matrix=new_matrix)
+    matrices = build_full_metrics_matrices(sim.G, inst.nodes)
+    term_scales = compute_term_scales(matrices)
+    return replace(
+        inst,
+        distance_matrix=matrices["time"],
+        raw_distance_matrix=matrices["distance"],
+        congestion_matrix=matrices["congestion"],
+        emissions_matrix=matrices["emissions"],
+        term_scales=term_scales,
+    )
 
 
 def reoptimize_on_incident(inst: VRPInstance, sim: TrafficSimulator,
