@@ -15,6 +15,7 @@ class TrafficSimulator:
         self.G = G
         self.rng = np.random.default_rng(seed)
         self._t = 0  # simulated time step
+        self._active_ramps = {}  # edge -> (steps_remaining, increment_per_step, peak)
         self._init_baseline_congestion()
 
     def _init_baseline_congestion(self):
@@ -40,14 +41,43 @@ class TrafficSimulator:
         """
         Advance simulated time. Congestion drifts with small random noise around
         each edge's baseline — call this repeatedly to simulate normal traffic
-        fluctuation between optimization runs.
+        fluctuation between optimization runs. Edges with an active gradual
+        buildup (see begin_developing_jam) are advanced toward their peak
+        instead of drifting around baseline.
         """
         self._t += dt
         for u, v in self.G.edges():
+            edge = (u, v)
+            if edge in self._active_ramps:
+                steps_remaining, increment, peak = self._active_ramps[edge]
+                current = self.G[u][v]["congestion"]
+                new_val = min(current + increment, peak)
+                self.G[u][v]["congestion"] = float(new_val)
+                steps_remaining -= 1
+                if steps_remaining <= 0:
+                    del self._active_ramps[edge]
+                else:
+                    self._active_ramps[edge] = (steps_remaining, increment, peak)
+                continue
+
             base = self.G[u][v]["_base_congestion"]
             noise = self.rng.normal(0, 0.03)
             new_val = np.clip(base + noise, 0.0, 0.9)
             self.G[u][v]["congestion"] = float(new_val)
+
+    def begin_developing_jam(self, u, v, ramp_steps: int = 15, peak_congestion: float = 0.85):
+        """
+        Simulates a jam FORMING gradually over `ramp_steps` calls to step(),
+        rather than appearing instantly (that's what inject_incident is for).
+        This is what makes prediction meaningful — a sudden incident can't be
+        forecast, but a gradually building jam has a trend a predictor can
+        actually pick up on before it peaks.
+        """
+        if not self.G.has_edge(u, v):
+            raise ValueError(f"No edge ({u}, {v}) in graph")
+        current = self.G[u][v]["congestion"]
+        increment = max((peak_congestion - current) / max(ramp_steps, 1), 0.0)
+        self._active_ramps[(u, v)] = (ramp_steps, increment, peak_congestion)
 
     def inject_incident(self, u, v, severity: float = 0.85, radius_hops: int = 1):
         """
