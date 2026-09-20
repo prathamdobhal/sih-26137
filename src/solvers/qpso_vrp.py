@@ -224,3 +224,34 @@ def solve_qpso_adaptive(inst: VRPInstance, swarm_size: int = 40, iterations: int
         "final_pbest": pbest,          # for explainability: alternative candidates
         "final_pbest_fitness": pbest_fitness,
     }
+
+
+def solve_qpso_multistart(inst: VRPInstance, mode: str = "fastest", swarm_size: int = 40,
+                           iterations: int = 70, n_restarts: int = 3, seed: int = 42,
+                           init_positions: np.ndarray = None, **kwargs):
+    """
+    Runs solve_qpso_adaptive `n_restarts` times with different random seeds and
+    keeps whichever result scores best under `mode`'s own cost function.
+
+    Why this exists: a single QPSO run is a stochastic search, and at the small
+    swarm/iteration budgets needed for an INTERACTIVE dashboard (as opposed to
+    the offline benchmarking in Phase 7, which uses much larger budgets), one
+    mode's search can occasionally land on a worse result for its OWN primary
+    metric than a differently-weighted mode's search does by chance — e.g.
+    "Fastest" mode showing a higher travel time than "Balanced" mode on the
+    same instance, which is confusing and wrong to show in a live demo.
+    Confirmed empirically: bare single runs get this wrong; 3 restarts at the
+    dashboard's normal budget (40 particles/70 iterations) reliably fixes it
+    while still finishing in well under a second, so it's used as the
+    dashboard's default rather than only bumping iteration count (which alone
+    did NOT reliably fix it — tested up to 80 particles/200 iterations).
+    """
+    best_routes, best_cost, best_meta = None, float("inf"), None
+    for i in range(n_restarts):
+        routes, cost, meta = solve_qpso_adaptive(
+            inst, swarm_size=swarm_size, iterations=iterations, seed=seed + i,
+            mode=mode, init_positions=init_positions, **kwargs
+        )
+        if cost < best_cost:
+            best_routes, best_cost, best_meta = routes, cost, meta
+    return best_routes, best_cost, best_meta

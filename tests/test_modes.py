@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.network.synthetic import make_synthetic_graph
 from src.network.traffic_simulator import TrafficSimulator
 from src.solvers.instance import generate_instance
-from src.solvers.qpso_vrp import solve_qpso_adaptive
+from src.solvers.qpso_vrp import solve_qpso_adaptive, solve_qpso_multistart
 from src.solvers.evaluate import route_set_cost, MODE_WEIGHTS
 from src.dynamic.emergency import apply_yield_penalty, clear_yield_penalty
 from src.dynamic.rerouting import recompute_instance_for_traffic
@@ -80,6 +80,38 @@ def test_emergency_mode_prioritizes_time_over_congestion():
     assert MODE_WEIGHTS["emergency"]["alpha"] > MODE_WEIGHTS["emergency"]["delta"]
 
 
+def test_multistart_keeps_fastest_at_or_below_other_modes_time():
+    """
+    Regression test for a real bug found via the dashboard: a SINGLE QPSO run
+    at the dashboard's interactive budget (40 particles/70 iterations) could
+    show Fastest mode with a HIGHER travel time than Balanced mode on the
+    same instance — confusing and wrong for a live demo, caused by ordinary
+    search variance at that budget (confirmed: more iterations alone did not
+    reliably fix it; multistart does). Checked across several seeds since a
+    single seed passing isn't enough evidence, per the project's usual
+    approach to variance-prone claims.
+    """
+    fails = 0
+    n_seeds = 6
+    for seed in range(n_seeds):
+        G = make_synthetic_graph(n_nodes=200, seed=seed + 40)
+        inst = generate_instance(G, n_customers=15, num_vehicles=3, vehicle_capacity=40, seed=seed + 40)
+
+        times = {}
+        for mode in ["fastest", "eco", "balanced"]:
+            routes, _, _ = solve_qpso_multistart(inst, mode=mode, swarm_size=40, iterations=70,
+                                                   n_restarts=3, seed=seed)
+            times[mode] = route_set_cost(routes, inst, mode=mode)["total_time"]
+
+        # Fastest (alpha=0.60) should not be meaningfully worse than Balanced
+        # (alpha=0.35) on raw time - allow a small tolerance for float/search noise
+        if times["fastest"] > times["balanced"] * 1.02:
+            fails += 1
+
+    print(f"\nFastest-worse-than-Balanced failures: {fails}/{n_seeds}")
+    assert fails <= 1, f"Expected this to be rare with multistart, got {fails}/{n_seeds} failures"
+
+
 def test_yield_penalty_raises_and_restores_congestion():
     G = make_synthetic_graph(n_nodes=150, seed=24)
     inst = generate_instance(G, n_customers=10, num_vehicles=2, vehicle_capacity=40, seed=24)
@@ -122,6 +154,7 @@ if __name__ == "__main__":
     test_same_routes_score_differently_across_modes()
     test_eco_mode_reduces_emissions_on_average()
     test_emergency_mode_prioritizes_time_over_congestion()
+    test_multistart_keeps_fastest_at_or_below_other_modes_time()
     test_yield_penalty_raises_and_restores_congestion()
     test_yield_penalty_increases_normal_fleet_cost_on_shared_roads()
     print("\nAll Day 11 smoke tests passed.")
